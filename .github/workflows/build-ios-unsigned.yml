@@ -1,0 +1,93 @@
+name: Build unsigned iPhone IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cabbit-ios-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      NODE_ENV: production
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+          cache: npm
+
+      - name: Ruby and Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3.7'
+          bundler: '2.6.9'
+
+      - name: Check Xcode and install dependencies
+        run: |
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          npm ci --include=dev
+          bundle install --jobs 4 --retry 3
+          bundle exec pod --version
+
+      - name: Check TypeScript and Expo versions
+        run: |
+          npm run typecheck
+          npm run check:dependencies
+          python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
+      - name: Generate iOS project
+        run: npm run prebuild:ios
+
+      - name: Install iOS pods
+        run: bundle exec pod install --project-directory=ios
+
+      - name: Compile device Release and package IPA
+        run: bash scripts/build-ios-unsigned.sh
+
+      - name: Upload validated unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: CabbitTest-unsigned-iphone-${{ github.run_number }}
+          path: |
+            build/CabbitTest-unsigned.ipa
+            build/CabbitTest-unsigned.ipa.sha256
+            build/ipa-validation.json
+            build/build-environment.txt
+            ios/Podfile.lock
+            Gemfile.lock
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build logs (also on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CabbitTest-build-logs-${{ github.run_number }}
+          path: |
+            build/xcodebuild.log
+            build/build-environment.txt
+            build/unsigned.*/Build.xcresult
+            ios/Podfile.lock
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Summary
+        run: |
+          echo '### Cabbit Test: device IPA built' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Download the unsigned IPA artifact, extract its ZIP and open the .ipa in Sideloadly on Windows.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This is an arm64 iPhoneOS Release build. Device installation and launch still require a physical iPhone test.' >> "$GITHUB_STEP_SUMMARY"

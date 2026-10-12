@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "CabbitTest",
+    "slug": "cabbit-ios-test",
+    "version": "1.0.0",
+    "platforms": ["ios"],
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "jsEngine": "hermes",
+    "updates": { "enabled": false },
+    "ios": {
+      "bundleIdentifier": "com.cabbit.iostest",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "infoPlist": {
+        "CFBundleDisplayName": "Cabbit Test",
+        "UIRequiredDeviceCapabilities": ["arm64"],
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
